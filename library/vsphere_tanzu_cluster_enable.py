@@ -290,7 +290,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         self.cluster_object.enable(self.cluster_id, cluster_spec)
 
         error_count = 0
-        errors_to_tollerate = 20
+        errors_to_tollerate = 30
         while True:
             wip_cluster = self.cluster_object.get(self.cluster_id)
             if wip_cluster.config_status == "RUNNING":
