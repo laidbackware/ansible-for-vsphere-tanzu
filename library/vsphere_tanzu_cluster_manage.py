@@ -9,125 +9,305 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: vmware_namespace_cluster_vds_manager
-short_description: Enable, disable and update namespaces on a vSphere cluster
+short_description: Enable, disable and update workload management on a vSphere cluster
 description:
-- TODO
+- Configure workload management on a vSphere cluster
 author:
 - Matt Proud (@laidbackware)
 notes:
-- Tested on vSphere 7.0u1
+- Tested on vSphere 7.0u2
 requirements:
 - python >= 3.5
 - PyVmomi
 - vSphere Automation SDK
+- Ansible Community VMware collection
 options:
 hostname: '{{ vcenter_hostname }}'
-    content_library_name: 
-      description:
-      - The name of the content library hosting VM images
-      - This is required only if I(state) is set to C(present).
-      type: str
-      required: True
+    cluster_distributed_switch:
+        escription:
+        - The name of the vSphere distributed switch for use with NSX-T.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(NSXT_CONTAINER_PLUGIN).
+        type: str
+        required: False
     cluster_name: 
-      description:
-      - The name of the name of the vsphere cluster to configure
-      type: str
-      required: True
+        description:
+        - The name of the name of the vsphere cluster to configure.
+        type: str
+        required: True
+    default_content_library: 
+        description:
+        - The name of the content library hosting VM images.
+        required: False
     dns_search_domains: 
-      description:
-      - The dns search domain to assign to the management cluster
-      type: str
-    haproxy_ca_chain: |
-    haproxy_management_ip: "192.168.0.173"
-    haproxy_management_port: "5556"
-    haproxy_password: haproxy
-    haproxy_username: password_here
-    haproxy_ip_range_list: ["172.31.0.128/26"]
-    management_address_count: 5
+        description:
+        - The dns search domain to assign to the management cluster.
+        type: str
+        required: False
+    cluster_distributed_switch:
+        description:
+        - The name of the vSphere distributed switch for use with NSX-T.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(NSXT_CONTAINER_PLUGIN).
+        type: str
+        required: False
+    egress_cidrs:
+        description:
+        - List of strings containing CIDRs to be used by NSX-T for egress traffic.
+        - Each item should follow network CIDR notation e.g 10.0.0.0/24.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(NSXT_CONTAINER_PLUGIN).
+        type: list
+        required: False
+    ephemeral_storage_policy:
+        description:
+        - The VM Storage Policy name to be used for ephemeral storage.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    haproxy_ca_chain:
+        description:
+        - Haproxy management CA certificate.
+        - Can either be public key of a self signed cert or the signing CA public key.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    haproxy_management_ip:
+        description:
+        - Haproxy management IP address.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    haproxy_management_port:
+        description:
+        - Haproxy management TCP port.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        default: 5556
+        required: False
+    haproxy_password:
+        description:
+        - Haproxy API password.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    haproxy_username:
+        description:
+        - Haproxy API username.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    haproxy_ip_range_list:
+        description:
+        - List of IP ranges used by haproxy for load balancers.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        suboptions:
+            starting_ip:
+                type: str
+                description: First usable IP address.
+            num_of_ips:
+                type: int
+                description: Number of sequential IPs to use after starting_IP.
+        type: list
+        elements: dict
+        required: False
+    image_storage_policy:
+        description:
+        - The VM Storage Policy name to be used for image storage.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    ingress_cidrs:
+        description:
+        - List of strings containing CIDRs to be used by NSX-T for ingress traffic.
+        - Each item should follow network CIDR notation e.g 10.0.0.0/24
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(NSXT_CONTAINER_PLUGIN).
+        type: list
+        required: False
+    management_address_count:
+        description:
+        - The default number of addresses reserved for management VMs.
+        - This is required only if I(state) is set to C(present).
+        type: int
+        required: False
     management_dns_servers:
-      description:
-      - List of strings containing DNS server IPs for the management network
-      - This is required only if I(state) is set to C(present).
-      type: list
-      required: True
-    management_gateway: "192.168.0.1"
-    management_netmask: "255.255.252.0"
-    management_port_group: routed-pg
-    management_starting_address: "192.168.0.174"
-    ntp_servers: ["192.168.0.1"]
+        description:
+        - List of strings containing DNS server IPs for the management network.
+        - This is required only if I(state) is set to C(present).
+        type: list
+        required: False
+    management_gateway:
+        description:
+        - The default gateway used by the management VMs.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    management_netmask:
+        description:
+        - The netmask used by the management VMs.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    management_ntp_servers:
+        description:
+        - List of strings containing NTP server IPs used by the management network.
+        - This is required only if I(state) is set to C(present).
+        type: list
+        required: False
+    management_port_group: 
+        description:
+        - The port group used by the management VMs.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    management_starting_address:
+        description:
+        - The starting IP to be used by the management VMs.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    master_storage_policy:
+        description:
+        - The VM Storage Policy name to be used for supervisor VMs.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    network_provider:
+        description:
+        - The network provider to be used in the supervisor cluster.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+        choices: [ 'VSPHERE_NETWORK', 'NSXT_CONTAINER_PLUGIN' ]
+    pod_cidrs:
+        description:
+        - List of strings containing CIDRs to be used by NSX-T for pod assignment.
+        - Each item should follow network CIDR notation e.g 10.0.0.0/24
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(NSXT_CONTAINER_PLUGIN).
+        type: list
+        required: False
     workload_dns_servers:
-      description:
-      - List of strings containing DNS server IPs for the workload network
-      - This is required only if I(state) is set to C(present).
-      type: list
-      required: True
-    workload_gateway: "172.31.0.1"
-    workload_netmask: "255.255.255.0"
-    workload_portgroup: private-pg
-    # workload_range_starting_ip: "172.31.0.3"
-    # workload_range_count: 40
-    workload_ip_range_list: ["172.31.0.32/27"]
-    services_cidr: "10.255.255.0"
-    supervisor_size: TINY
-    storage_policy_name: "tkgs-storage-policy"
+        description:
+        - List of strings containing DNS server IPs for the workload network.
+        - This is required only if I(state) is set to C(present).
+        type: list
+        required: True
+    workload_gateway:
+        description:
+        - The default gateway used by the workload VMs.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    workload_netmask:
+        description:
+        - The netmask used by the workload VMs.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    workload_ntp_servers:
+        description:
+        - List of strings containing NTP server IPs used by the workload network.
+        - This is required only if I(state) is set to C(present).
+        type: list
+        required: False
+    workload_portgroup:
+        description:
+        - The port group used by the workload VMs.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        type: str
+        required: False
+    workload_ip_range_list:
+        description:
+        - List of IP ranges used by workload VMs.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(network_provider) is set to C(VSPHERE_NETWORK).
+        suboptions:
+            starting_ip:
+                type: str
+                description: First usable IP address.
+            num_of_ips:
+                type: int
+                description: Number of sequential IPs to use after starting_IP.
+        type: list
+        elements: dict
+        required: False
+    services_cidr:
+        description:
+        - The cidr to be used by internal Kubernetes services.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+    supervisor_size:
+        description:
+        - The network provide to be used in the supervisor cluster.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+        choices: [ 'TINY', 'SMALL', 'MEDIUM', 'LARGE']
     
 extends_documentation_fragment:
 - community.vmware.vmware_rest_client.documentation
 
 '''
 EXAMPLES = r'''
-- name: Enable Namespaces on Cluster
+- name: Enable Namespaces on Cluster with vSphere Networking
   community.vmware.vmware_namespace_cluster_vds_manager:
-    hostname: '{{ vcenter_hostname }}'
-    username: '{{ vcenter_username }}'
-    password: '{{ vcenter_password }}'
-    content_library_name: "tkgs-library"
+    hostname: vcenter.example.local
+    username: administrator@vsphere.local
+    password: password
+    validate_certs: false
     cluster_name: tkgs-cluster
-    dns_search_domains: ["home.local"]
-    dns_servers: ["192.168.0.110"]
+    default_content_library: "tkgs-library"
+    dns_search_domains: 
+        -   example.local
+    ephemeral_storage_policy: "tkgs-storage-policy"
     haproxy_ca_chain: |
         -----BEGIN CERTIFICATE-----
-        MIIDoTCCAomgAwIBAgIJAME387BtGGikMA0GCSqGSIb3DQEBBQUAMG4xCzAJBgNV
-        BAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRIwEAYDVQQHDAlQYWxvIEFsdG8x
-        DzANBgNVBAoMBlZNd2FyZTENMAsGA1UECwwEQ0FQVjEWMBQGA1UEAwwNMTkyLjE2
-        OC4wLjE3MzAeFw0yMDEyMTgxMzI0NDhaFw0zMDEyMTYxMzI0NDhaMG4xCzAJBgNV
-        BAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRIwEAYDVQQHDAlQYWxvIEFsdG8x
-        DzANBgNVBAoMBlZNd2FyZTENMAsGA1UECwwEQ0FQVjEWMBQGA1UEAwwNMTkyLjE2
-        OC4wLjE3MzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOpaFdTntwKj
-        7iEThLB7+GA4SIxJLHXmnh05Y2L0lZ0TMz2h2tsnI+Hv2x9QlVQtIiSpTxb89xl8
-        3qE/IBvaNc/8vRY8h4gaFbkh0GS+9JoQzPFYnZrI9fzNwh2cyKqigzzJEe61JX0p
-        XhN42lzdziUu2qYgAvwLPne3UCKI/CenU0WHOcq61cCEaE07nPKbjKgLD20SSiv/
-        f+4JnvzeAU7d6De+78mQIxTCyBeQG9ZeE/y22fHoNbIu5rQKIfhYtyDuv8mpC3Z3
-        HyRKL4z/DcO0aLanbYQsFB0IhI1ZZvkqcRIarI0atPJPjxcl7xHtcojTTfpy0QvH
-        K77D81ZEQB8CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMC
-        AYYwHQYDVR0OBBYEFC+EVdoW1yy6sv1S58G6imTwXRGbMA0GCSqGSIb3DQEBBQUA
-        A4IBAQBn9U5aJSOmLRzmHWxgxfnu+28ksOCsuVpBVHm6+q7mrA/ArbuMncUBbnO1
-        lCxDTJq+LOjAtDJeMhIDEPnCRBeBcrsvvoRIV2YR1kvrhCaWZoNTT07Jm9K5wBYx
-        BTbJdvnp7kI0e/sgpRlRGFO/31ey5ItknQXGCTJ4qzp3KbtQ5qz+dvGz0iFykj31
-        DYTqg5Da9WYBTnCm2a641OuoVfkK9Toq5kISTNkoi8JLhlJwQUuRFRE6OJfiLCQs
-        0pC0Q8G1u2ToTZE0jntjy4BzxGZq26A/SrpFP/d8dksjo1IpRNLvA26+BJ7Ir/qY
-        r32oIPyK4InlL/FMoVrmefDRTAwy
+        <Public key>
         -----END CERTIFICATE-----
-    haproxy_management_ip: "192.168.0.173"
+    haproxy_management_ip: "10.0.0.2"
     haproxy_management_port: "5556"
-    haproxy_password: haproxy
-    haproxy_username: password_here
-    haproxy_ip_range_list: ["172.31.0.128/26"]
+    haproxy_password: password
+    haproxy_username: haproxy
+    haproxy_ip_range_list:
+        -   starting_ip: 
+            num_of_ips:
+    image_storage_policy: tkgs-storage-policy
     management_address_count: 5
-    management_gateway: "192.168.0.1"
+    management_dns_servers: 
+        -   "192.168.0.1"
+    management_gateway: "10.0.0.1"
     management_port_group: routed-pg
-    management_netmask: "255.255.252.0"
-    management_starting_address: "192.168.0.174"
-    ntp_servers: ["192.168.0.1"]
+    management_netmask: "255.255.255.0"
+    management_ntp_servers: 
+        -   "192.168.0.1"
+    management_starting_address: "10.0.0.3"
+    master_storage_policy: tkgs-storage-policy
+    network_provider: VSPHERE_NETWORK
+    
+    workload_dns_servers:
+        -   "192.168.0.1" 
     workload_gateway: "172.31.0.1"
     workload_netmask: "255.255.255.0"
+    workload_ntp_servers: 
+        -   "192.168.0.1"
     workload_portgroup: private-pg
-    # workload_range_starting_ip: "172.31.0.3"
-    # workload_range_count: 40
-    workload_ip_range_list: ["172.31.0.32/27"]
-    services_cidr: "10.255.255.0"
+    workload_ip_range_list:
+        -   starting_ip: "172.31.0.3"
+            num_of_ips: 120
+    services_cidr: "10.255.252.0/22"
     supervisor_size: TINY
-    storage_policy_name: "tkgs-storage-policy"
     state: present
   delegate_to: localhost
   async: 1800
@@ -213,18 +393,19 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         self.management_address_count = self.params.get('management_address_count')
         self.management_dns_servers = self.params.get('management_dns_servers')
         self.management_netmask = self.params.get('management_netmask')
+        self.management_ntp_servers = self.params.get('management_ntp_servers')
         self.management_gateway = self.params.get('management_gateway')
         self.management_port_group = self.params.get('management_port_group')
         self.management_starting_address = self.params.get('management_starting_address')
         self.master_storage_policy = self.params.get('master_storage_policy')
         self.nsx_edge_cluster = self.params.get('nsx_edge_cluster')
-        self.ntp_servers = self.params.get('ntp_servers')
         self.pod_cidrs = self.params.get('pod_cidrs')
         self.services_cidr = self.params.get('services_cidr')
         self.supervisor_size = self.params.get('supervisor_size')
         self.workload_dns_servers = self.params.get('workload_dns_servers')
         self.workload_gateway = self.params.get('workload_gateway')
         self.workload_netmask = self.params.get('workload_netmask')
+        self.workload_ntp_servers = self.params.get('workload_ntp_servers')
         self.workload_portgroup = self.params.get('workload_portgroup')
         self.workload_ip_range_list = self.params.get('workload_ip_range_list') 
 
@@ -397,8 +578,9 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         cluster_spec.network_provider = self.network_provider
         cluster_spec.master_dns = self.management_dns_servers
         cluster_spec.worker_dns = self.workload_dns_servers
-        cluster_spec.master_dns_search_domains = self.dns_search_domains
-        cluster_spec.master_ntp_servers = self.ntp_servers
+        cluster_spec.master_ntp_servers = self.management_ntp_servers
+        if self.dns_search_domains:
+            cluster_spec.master_dns_search_domains = self.dns_search_domains
         
         cluster_spec.image_storage = self.cluster_object.ImageStorageSpec(
             self.get_object_by_name(self.image_storage_policy, 'policy')
@@ -406,8 +588,9 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         cluster_spec.ephemeral_storage_policy = self.get_object_by_name(self.ephemeral_storage_policy, 'policy')
         cluster_spec.master_storage_policy = self.get_object_by_name(self.master_storage_policy, 'policy')
 
-        default_content_library = self.get_content_library_by_name(self.default_content_library)
-        cluster_spec.default_kubernetes_service_content_library = default_content_library
+        if self.default_content_library:
+            default_content_library = self.get_content_library_by_name(self.default_content_library)
+            cluster_spec.default_kubernetes_service_content_library = default_content_library
 
         management_network_range = self.cluster_object.Ipv4Range()
         management_network_range.starting_address = self.management_starting_address
@@ -458,7 +641,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
             workload_network_enable_spec.supervisor_primary_workload_network = workload_network_spec
         
             cluster_spec.workload_networks_spec = workload_network_enable_spec
-            cluster_spec.workload_ntp_servers = self.ntp_servers
+            cluster_spec.workload_ntp_servers = self.workload_ntp_servers
             cluster_spec.load_balancer_config_spec = loadbalancer_spec
 
         elif self.network_provider == 'NSXT_CONTAINER_PLUGIN':
@@ -532,20 +715,21 @@ def main():
         management_dns_servers=dict(type='list', required=False),
         management_gateway=dict(type='str', required=False),
         management_netmask=dict(type='str', required=False),
+        management_ntp_servers=dict(type='list', required=False),
         management_port_group=dict(type='str', required=False),
         management_starting_address=dict(type='str', required=False),
         master_storage_policy=dict(type='str', required=False),
         network_provider=dict(type='str', required=True, choices=['VSPHERE_NETWORK', 'NSXT_CONTAINER_PLUGIN']),
         nsx_edge_cluster=dict(type='str', required=False),
-        ntp_servers=dict(type='list', required=False),
         pod_cidrs=dict(type='list', required=False),
         workload_dns_servers=dict(type='list', required=False),
         workload_gateway=dict(type='str', required=False),
         workload_netmask=dict(type='str', required=False),
+        workload_ntp_servers=dict(type='list', required=False),
         workload_portgroup=dict(type='str', required=False),
         workload_ip_range_list=dict(type='list', required=False),
         services_cidr=dict(type='str', required=False),
-        supervisor_size=dict(type='str', choices=['TINY', 'SMALL', 'MEDIUM', 'LARGE', 'XLARGE'], required=False), 
+        supervisor_size=dict(type='str', choices=['TINY', 'SMALL', 'MEDIUM', 'LARGE'], required=False), 
         state=dict(type='str', choices=['present', 'absent'], default='present', required=False),
         # storage_policy_name=dict(type='str', required=False),
     )
@@ -553,11 +737,12 @@ def main():
                            supports_check_mode=True,
                            required_if=[
                                 ('state', 'present', [
-                                    'default_content_library', 'ephemeral_storage_policy', 'image_storage_policy',
-                                    'management_dns_servers', 'management_port_group', 'management_gateway', 
-                                    'management_starting_address', 'management_netmask', 'master_storage_policy',
-                                    'network_provider', 'ntp_servers','services_cidr', 'supervisor_size', 
-                                    'workload_dns_servers'
+                                    'ephemeral_storage_policy', 'image_storage_policy', 'management_dns_servers', 
+                                    'management_gateway', 'management_netmask', 'management_ntp_servers',
+                                    'management_port_group', 'management_starting_address', 'master_storage_policy',
+                                    'network_provider', 'services_cidr', 'supervisor_size', 'workload_dns_servers',
+                                    'workload_ntp_servers'
+                                    
                                 ]),
                                 ('network_provider', 'VSPHERE_NETWORK', [
                                     'haproxy_ca_chain', 'haproxy_management_ip', 'haproxy_password', 

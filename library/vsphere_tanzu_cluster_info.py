@@ -2,27 +2,29 @@
 # -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 
 DOCUMENTATION = r'''
 ---
 module: vsphere_tanzu_cluster_info
-short_description: Gather information about configuration state of Kubernetes on a vSphere Cluster
+short_description: Gather information about Tanzu configuration of a vSphere Cluster
 description:
-- TODO
+- Return all Tanzu related configuration from a vSphere cluster
 author:
 - Matt Proud (@laidbackware)
 notes:
 - Tested on vSphere 7.0u1
 requirements:
 - python >= 3.5
-# - PyVmomi
-- vSphere Automation SDK 7.0u1 or higher
+- vSphere Automation SDK 7.0u2 or higher
 - community.vmware modules either from Ansible Galaxy or as part of the community collections package
 options:
-    
+    cluster_name: 
+      description:
+      - The name of the name of the vsphere cluster to configure
+      type: str
+      required: True
 extends_documentation_fragment:
 - community.vmware.vmware_rest_client.documentation
 
@@ -38,7 +40,7 @@ EXAMPLES = r'''
 '''
 
 RETURN = r'''
-namespace_cluster_vds_info:
+cluster_info:
 
 '''
 
@@ -46,7 +48,6 @@ import uuid
 from time import sleep
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.community.vmware.plugins.module_utils.vmware_rest_client import VmwareRestClient
-# from ansible_collections.community.vmware.plugins.module_utils.vmware import PyVmomi
 from com.vmware.vapi.std.errors_client import Unsupported
 import urllib3
 urllib3.disable_warnings()
@@ -74,7 +75,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         except Unsupported:
             self.module.fail_json(msg="Cluster named '%s' does not have workload management enabled" % self.cluster_name)
 
-        self.module.exit_json(exists=False, changed=False, content_lib_details=cluster_info.to_dict())
+        self.module.exit_json(exists=False, changed=False, cluster_info=cluster_info.to_dict())
 
     # return the internal identifier of an object
     def get_object_by_name(self, object_name, object_type):
