@@ -261,17 +261,17 @@ extends_documentation_fragment:
 
 '''
 EXAMPLES = r'''
-- name: Enable Namespaces on Cluster with vSphere Networking
-  community.vmware.vmware_namespace_cluster_vds_manager:
+- name: Enable Namespaces on a Cluster with vSphere Networking
+  vsphere_tanzu_cluster_manage:
     hostname: vcenter.example.local
     username: administrator@vsphere.local
     password: password
     validate_certs: false
     cluster_name: tkgs-cluster
-    default_content_library: "tkgs-library"
+    default_content_library: tkgs-library
     dns_search_domains: 
         -   example.local
-    ephemeral_storage_policy: "tkgs-storage-policy"
+    ephemeral_storage_policy: tkgs-storage-policy
     haproxy_ca_chain: |
         -----BEGIN CERTIFICATE-----
         <Public key>
@@ -281,8 +281,8 @@ EXAMPLES = r'''
     haproxy_password: password
     haproxy_username: haproxy
     haproxy_ip_range_list:
-        -   starting_ip: 
-            num_of_ips:
+        -   starting_ip: "172.31.0.1"
+            num_of_ips: 30
     image_storage_policy: tkgs-storage-policy
     management_address_count: 5
     management_dns_servers: 
@@ -294,8 +294,7 @@ EXAMPLES = r'''
         -   "192.168.0.1"
     management_starting_address: "10.0.0.3"
     master_storage_policy: tkgs-storage-policy
-    network_provider: VSPHERE_NETWORK
-    
+    network_provider: VSPHERE_NETWORK  
     workload_dns_servers:
         -   "192.168.0.1" 
     workload_gateway: "172.31.0.1"
@@ -313,8 +312,47 @@ EXAMPLES = r'''
   async: 1800
   poll: 5
 
+- name: Enable Namespaces on a Cluster with NSX-T
+  vsphere_tanzu_cluster_manage:
+    hostname: vcenter.example.local
+    username: administrator@vsphere.local
+    password: password
+    validate_certs: false
+    cluster_distributed_switch: vds-nsxt
+    cluster_name: tkgs-cluster
+    default_content_library: tkgs-library
+    dns_search_domains:
+        -   example.local
+    egress_cidrs: 10.0.1.0/24
+    ephemeral_storage_policy: tkgs-storage-policy
+    image_storage_policy: tkgs-storage-policy
+    ingress_cidrs: 10.0.0.0/24
+    management_address_count: 5
+    management_dns_servers: 
+        -   "192.168.0.1"
+    management_gateway: "10.0.0.1"
+    management_port_group: routed-pg
+    management_netmask: "255.255.255.0"
+    management_ntp_servers: 
+        -   "192.168.0.1"
+    management_starting_address: "10.0.0.3"
+    master_storage_policy: tkgs-storage-policy
+    network_provider: NSXT_CONTAINER_PLUGIN
+    nsx_edge_cluster: edge-cluster-1
+    pod_cidrs: 172.16.0.0/20
+    workload_dns_servers:
+        -   "192.168.0.1" 
+    workload_ntp_servers: 
+        -   "192.168.0.1"
+    services_cidr: "10.255.252.0/22"
+    supervisor_size: TINY
+    state: present
+  delegate_to: localhost
+  async: 1800
+  poll: 5
+
 - name: Disable Namespaces on Cluster
-  community.vmware.vmware_namespace_cluster_vds_manager:
+  vsphere_tanzu_cluster_manage:
     hostname: '{{ vcenter_hostname }}'
     username: '{{ vcenter_username }}'
     password: '{{ vcenter_password }}'
@@ -602,6 +640,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         management_network_spec.network = self.get_object_by_name(self.management_port_group, 'network')
         management_network_spec.mode = 'STATICRANGE'
         management_network_spec.address_range = management_network_range
+        
         cluster_spec.master_management_network = management_network_spec
         
         self.check_ip_address(self.services_cidr, 'services_cidr', 'cidr')
