@@ -131,6 +131,13 @@ hostname: '{{ vcenter_hostname }}'
         - This is required only if I(network_provider) is set to C(NSXT_CONTAINER_PLUGIN).
         type: list
         required: False
+    load_balancer_provider:
+        description:
+        - The load balancer provider to be used in the supervisor cluster.
+        - This is required only if I(state) is set to C(present).
+        type: str
+        required: False
+        choices: [ 'AVI', 'HA_PROXY' ]
     management_address_count:
         description:
         - The default number of addresses reserved for management VMs.
@@ -186,6 +193,35 @@ hostname: '{{ vcenter_hostname }}'
         type: str
         required: False
         choices: [ 'VSPHERE_NETWORK', 'NSXT_CONTAINER_PLUGIN' ]
+    nsx_alb_ca_chain:
+        description:
+        - NSX ALB management CA certificate.
+        - Can either be public key of a self signed cert or the signing CA public key.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(load_balancer_provider) is set to C(AVI).
+        type: str
+        required: False
+    nsx_alb_management_ip:
+        description:
+        - NSX ALB management IP address.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(load_balancer_provider) is set to C(AVI).
+        type: str
+        required: False
+    nsx_alb_password:
+        description:
+        - NSX ALB API password.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(load_balancer_provider) is set to C(AVI).
+        type: str
+        required: False
+    nsx_alb_username:
+        description:
+        - NSX ALB API username.
+        - This is required only if I(state) is set to C(present).
+        - This is required only if I(load_balancer_provider) is set to C(AVI).
+        type: str
+        required: False
     pod_cidrs:
         description:
         - List of strings containing CIDRs to be used by NSX-T for pod assignment.
@@ -261,7 +297,55 @@ extends_documentation_fragment:
 
 '''
 EXAMPLES = r'''
-- name: Enable Namespaces on a Cluster with vSphere Networking
+- name: Enable Namespaces on a Cluster with vSphere Networking and NSX ALB
+  vsphere_tanzu_cluster_manage:
+    hostname: vcenter.example.local
+    username: administrator@vsphere.local
+    password: password
+    validate_certs: false
+    cluster_name: tkgs-cluster
+    default_content_library: tkgs-library
+    dns_search_domains: 
+        -   example.local
+    ephemeral_storage_policy: tkgs-storage-policy
+    nsx_alb_ca_chain: |
+        -----BEGIN CERTIFICATE-----
+        <Public key>
+        -----END CERTIFICATE-----
+    nsx_alb_server: "10.0.0.2"
+    nsx_alb_password: password
+    nsx_alb_username: haproxy
+    image_storage_policy: tkgs-storage-policy
+    load_balancer_provider: "AVI"
+    management_address_count: 5
+    management_dns_servers: 
+        -   "192.168.0.1"
+    management_gateway: "10.0.0.1"
+    management_port_group: routed-pg
+    management_netmask: "255.255.255.0"
+    management_ntp_servers: 
+        -   "192.168.0.1"
+    management_starting_address: "10.0.0.3"
+    master_storage_policy: tkgs-storage-policy
+    network_provider: VSPHERE_NETWORK  
+    workload_dns_servers:
+        -   "192.168.0.1" 
+    workload_gateway: "172.31.0.1"
+    workload_netmask: "255.255.255.0"
+    workload_ntp_servers: 
+        -   "192.168.0.1"
+    workload_portgroup: private-pg
+    workload_ip_range_list:
+        -   starting_ip: "172.31.0.3"
+            num_of_ips: 120
+    services_cidr: "10.255.252.0/22"
+    supervisor_size: TINY
+    state: present
+  delegate_to: localhost
+  async: 1800
+  poll: 5
+
+- name: Enable Namespaces on a Cluster with vSphere Networking and HA Proxy
   vsphere_tanzu_cluster_manage:
     hostname: vcenter.example.local
     username: administrator@vsphere.local
@@ -284,6 +368,7 @@ EXAMPLES = r'''
         -   starting_ip: "172.31.0.1"
             num_of_ips: 30
     image_storage_policy: tkgs-storage-policy
+    load_balancer_provider: "HA_PROXY"
     management_address_count: 5
     management_dns_servers: 
         -   "192.168.0.1"
@@ -405,7 +490,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         super(VmwareNamespaceClusterVdsManage, self).__init__(module)
 
         self.cluster_object = Clusters(self.api_client._stub_config)
-        self.loadbalancer_object = LoadBalancers(self.api_client._stub_config)
+        self.load_balancer_object = LoadBalancers(self.api_client._stub_config)
         self.network_object = Networks(self.api_client._stub_config)
         self.vsphere_api_object_mapping = {
             'network': self.api_client.vcenter.Network,
@@ -419,6 +504,11 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         self.dns_search_domains = self.params.get('dns_search_domains')
         self.egress_cidrs = self.params.get('egress_cidrs')
         self.ephemeral_storage_policy = self.params.get('ephemeral_storage_policy')
+        
+        self.nsx_alb_server = self.params.get('nsx_alb_server')
+        self.nsx_alb_username = self.params.get('nsx_alb_username')
+        self.nsx_alb_password = self.params.get('nsx_alb_password')
+        self.nsx_alb_ca_chain = self.params.get('nsx_alb_ca_chain')
         self.haproxy_ca_chain = self.params.get('haproxy_ca_chain')
         self.haproxy_management_ip = self.params.get('haproxy_management_ip')
         self.haproxy_management_port = self.params.get('haproxy_management_port')
@@ -427,6 +517,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         self.haproxy_username = self.params.get('haproxy_username')
         self.image_storage_policy = self.params.get('image_storage_policy')
         self.ingress_cidrs = self.params.get('ingress_cidrs')
+        self.load_balancer_provider = self.params.get('load_balancer_provider')
         self.network_provider = self.params.get('network_provider')
         self.management_address_count = self.params.get('management_address_count')
         self.management_dns_servers = self.params.get('management_dns_servers')
@@ -561,7 +652,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         self.cluster_object.enable(self.cluster_id, cluster_spec)
 
         error_count = 0
-        errors_to_tollerate = 48
+        errors_to_tollerate = 120
         # Wait until workload management reports as configured
         while True:
             cluster_object = self.cluster_object.get(self.cluster_id)
@@ -650,20 +741,36 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         cluster_spec.service_cidr = services_cidr
 
         if self.network_provider == 'VSPHERE_NETWORK':
-            #TODO check HA proxy connection and error if issues
-            haproxy_spec = self.loadbalancer_object.HAProxyConfigCreateSpec()
-            haproxy_spec.servers = [self.loadbalancer_object.Server(host=self.haproxy_management_ip ,port=int(self.haproxy_management_port))]
-            haproxy_spec.username = self.haproxy_username
-            haproxy_spec.password = self.haproxy_password
-            haproxy_spec.certificate_authority_chain = self.haproxy_ca_chain
+            load_balancer_spec = self.load_balancer_object.ConfigSpec()
+            if self.load_balancer_provider == 'AVI':
+                nsx_alb_spec = self.load_balancer_object.AviConfigCreateSpec()
+                nsx_alb_spec.server = self.load_balancer_object.Server(host=self.nsx_alb_server, port=443)
+                nsx_alb_spec.username = self.nsx_alb_username
+                nsx_alb_spec.password = self.nsx_alb_password
+                # TODO validate certificate
+                nsx_alb_spec.certificate_authority_chain = self.nsx_alb_ca_chain
 
-            loadbalancer_spec = self.loadbalancer_object.ConfigSpec()
-            loadbalancer_spec.id = 'haproxy'
-            haproxy_ranges = self.build_range_list(self.haproxy_ip_range_list, 'haproxy_ip_range_list')
-            loadbalancer_spec.address_ranges = haproxy_ranges
-            loadbalancer_spec.provider = 'HA_PROXY'
-            loadbalancer_spec.ha_proxy_config_create_spec = haproxy_spec
-        
+                dummy_range_list = [{"starting_ip": "1.0.0.0" , "num_of_ips": "100"}]
+                dummy_ranges = self.build_range_list(dummy_range_list, 'dummy_range_list')
+                load_balancer_spec.address_ranges = dummy_ranges
+                load_balancer_spec.id = 'nsx-alb'
+                load_balancer_spec.provider = 'AVI'
+                load_balancer_spec.avi_config_create_spec = nsx_alb_spec
+            elif self.load_balancer_provider == 'HA_PROXY':
+                #TODO check HA proxy connection and error if issues
+                haproxy_spec = self.load_balancer_object.HAProxyConfigCreateSpec()
+                haproxy_spec.servers = [self.load_balancer_object.Server(host=self.haproxy_management_ip ,port=int(self.haproxy_management_port))]
+                haproxy_spec.username = self.haproxy_username
+                haproxy_spec.password = self.haproxy_password
+                haproxy_spec.certificate_authority_chain = self.haproxy_ca_chain
+
+                load_balancer_spec = self.load_balancer_object.ConfigSpec()
+                load_balancer_spec.id = 'haproxy'
+                haproxy_ranges = self.build_range_list(self.haproxy_ip_range_list, 'haproxy_ip_range_list')
+                load_balancer_spec.address_ranges = haproxy_ranges
+                load_balancer_spec.provider = 'HA_PROXY'
+                load_balancer_spec.ha_proxy_config_create_spec = haproxy_spec
+
             workload_vsphere_network_spec = self.network_object.VsphereDVPGNetworkCreateSpec()
             workload_vsphere_network_spec.portgroup = self.get_object_by_name(self.workload_portgroup, 'network')
             workload_ranges = self.build_range_list(self.workload_ip_range_list, 'workload_ip_range_list')
@@ -681,7 +788,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
         
             cluster_spec.workload_networks_spec = workload_network_enable_spec
             cluster_spec.workload_ntp_servers = self.workload_ntp_servers
-            cluster_spec.load_balancer_config_spec = loadbalancer_spec
+            cluster_spec.load_balancer_config_spec = load_balancer_spec
 
         elif self.network_provider == 'NSXT_CONTAINER_PLUGIN':
             nsx_spec = self.cluster_object.NCPClusterNetworkEnableSpec()
@@ -736,6 +843,10 @@ def main():
     argument_spec = VmwareRestClient.vmware_client_argument_spec()
     argument_spec.update(
         
+        nsx_alb_server=dict(type='str', required=False),
+        nsx_alb_username=dict(type='str', required=False),
+        nsx_alb_password=dict(type='str', required=False),
+        nsx_alb_ca_chain=dict(type='str', required=False),
         cluster_distributed_switch=dict(type='str', required=False),
         cluster_name=dict(type='str', required=True),
         default_content_library=dict(type='str', required=False),
@@ -750,6 +861,7 @@ def main():
         haproxy_username=dict(type='str', required=False),
         image_storage_policy=dict(type='str', required=False),
         ingress_cidrs=dict(type='list', required=False),
+        load_balancer_provider=dict(type='str', required=False, choices=['AVI', 'HA_PROXY'], default='AVI'),
         management_address_count=dict(type='int', required=False, default=5),
         management_dns_servers=dict(type='list', required=False),
         management_gateway=dict(type='str', required=False),
@@ -770,7 +882,6 @@ def main():
         services_cidr=dict(type='str', required=False),
         supervisor_size=dict(type='str', choices=['TINY', 'SMALL', 'MEDIUM', 'LARGE'], required=False), 
         state=dict(type='str', choices=['present', 'absent'], default='present', required=False),
-        # storage_policy_name=dict(type='str', required=False),
     )
     module = AnsibleModule(argument_spec=argument_spec,
                            supports_check_mode=True,
@@ -784,6 +895,12 @@ def main():
                                     
                                 ]),
                                 ('network_provider', 'VSPHERE_NETWORK', [
+                                    'load_balancer_provider',
+                                ]),
+                                ('load_balancer_provider', 'AVI', [
+                                    'nsx_alb_server', 'nsx_alb_username', 'nsx_alb_password', 'nsx_alb_ca_chain'
+                                ]),
+                                ('load_balancer_provider', 'HA_PROXY', [
                                     'haproxy_ca_chain', 'haproxy_management_ip', 'haproxy_password', 
                                     'haproxy_ip_range_list', 'haproxy_username', 'workload_dns_servers',
                                     'workload_gateway', 'workload_portgroup', 'workload_ip_range_list',
