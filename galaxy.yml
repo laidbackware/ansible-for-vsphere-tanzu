@@ -1,0 +1,31 @@
+namespace: vmware
+
+name: ansible_for_vsphere_with_tanzu
+
+version: 0.0.1
+
+readme: README.md
+
+authors:
+- Matt Proud
+
+description: Ansible Modules for vSphere with Tanzu
+
+license:
+- GPL-3.0-only
+
+license_file: LICENSE.txt 
+
+tags: [vmware, ansible, tanzu]
+
+dependencies: {}
+
+repository: https://github.com/laidbackware/ansible-for-vsphere-tanzu
+
+documentation: https://github.com/laidbackware/ansible-for-vsphere-tanzu
+
+homepage: https://github.com/laidbackware/ansible-for-vsphere-tanzu
+
+issues: https://github.com/laidbackware/ansible-for-vsphere-tanzu/issues
+
+build_ignore: []
