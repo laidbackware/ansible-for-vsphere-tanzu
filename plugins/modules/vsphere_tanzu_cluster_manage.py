@@ -825,7 +825,7 @@ class VmwareNamespaceClusterVdsManage(VmwareRestClient):
 
     def state_disable_cluster(self):
         """
-        Disable cluser
+        Disable cluster
 
         """
         self.cluster_object.disable(self.cluster_id)
@@ -861,7 +861,7 @@ def main():
         haproxy_username=dict(type='str', required=False),
         image_storage_policy=dict(type='str', required=False),
         ingress_cidrs=dict(type='list', required=False),
-        load_balancer_provider=dict(type='str', required=False, choices=['AVI', 'HA_PROXY'], default='AVI'),
+        load_balancer_provider=dict(type='str', required=False, choices=['AVI', 'HA_PROXY']),
         management_address_count=dict(type='int', required=False, default=5),
         management_dns_servers=dict(type='list', required=False),
         management_gateway=dict(type='str', required=False),
